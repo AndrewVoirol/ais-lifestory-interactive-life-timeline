@@ -1,10 +1,8 @@
-![LifeStory — AI-powered interactive life timeline with confetti celebration](screenshots/light-mode.png)
+![LifeStory — collaborative memory timeline with AI biographer](screenshots/room-chat.png)
 
 # LifeStory
 
-An AI-powered biographer that interviews you about your life, draws out memories you forgot you had, and builds a beautiful, draggable timeline as you talk. Because the way you remember your past isn't always the way others experienced it with you — and some moments are too incredible to let fade.
-
-Use it to document your own story. Bring it to a wedding. Build a memorial. Let someone who's lost pieces of their past rebuild them with help from the people who were there.
+An AI biographer that interviews you about your life and builds a collaborative timeline as you talk. Invite the people who were there — your siblings, your college roommate, your parents — and let them add their own memories, upload photos, and correct the details you got wrong. Because we all remember things differently, and that's kind of the point.
 
 ## Quick Start
 
@@ -24,19 +22,52 @@ NEXT_PUBLIC_GEMINI_API_KEY=your_key_here
 npm run dev
 ```
 
-Open [localhost:3000](http://localhost:3000). Start talking.
+Open [localhost:3000](http://localhost:3000). Click "Start a Story." Share the room code with the people who were there.
 
 ## How It Works
 
-Share a memory with the biographer. It listens, asks follow-ups, and when it recognizes a life event, it extracts it — title, date, description — and drops it onto your timeline with a burst of confetti. Upload photos and the AI will analyze them for context. Drag events to reorder. Click dates to edit. Open multiple tabs and watch them sync in real time.
+1. **Start or join a room** — get a shareable code like `golden-memories-42`
+2. **Talk to the biographer** — it asks warm, probing follow-up questions and streams responses in real-time
+3. **Watch your timeline build** — the AI extracts dates, titles, and descriptions from your conversation and drops them onto a draggable timeline
+4. **Invite contributors** — share the room code, each person picks a name and color
+5. **Argue about the details** — comment on events, mark corrections ("No, that was 1997, not 1998"), drag things to the right spot
+6. **Upload the evidence** — attach photos to events, see who uploaded what
 
-Under the hood: Gemini 2.5 Flash handles the interview, event extraction (via structured JSON output), image analysis, and text-to-speech. The timeline persists to a local JSON file and broadcasts updates via Server-Sent Events so multiple clients stay in sync.
+Under the hood: Gemini 2.5 Flash handles the interview, event extraction (structured JSON), image analysis, and text-to-speech. Events persist to per-room JSON files and broadcast via Server-Sent Events so everyone stays in sync.
 
 ## Screenshots
 
-| Initial State | Active Interview |
-|:---:|:---:|
-| ![Dark mode — empty timeline awaiting your story](screenshots/initial-state.png) | ![Mid-flow — chat and timeline with extracted events](screenshots/mid-flow.png) |
+| Landing | Join a Room | In the Room |
+|:---:|:---:|:---:|
+| ![Landing page — Start or join a story](screenshots/landing-page.png) | ![Contributor identity — pick name and color](screenshots/contributor-modal.png) | ![Room — chat with biographer, events on timeline](screenshots/room-chat.png) |
+
+## Demo Photos
+
+The app ships with 8 sample photos of a character "Alex" across life stages — the kind of photos that surface when friends and family start arguing about what really happened.
+
+| | | | |
+|:---:|:---:|:---:|:---:|
+| ![School photo](public/demo-photos/childhood-school-photo.jpg) | ![Birthday](public/demo-photos/childhood-birthday.jpg) | ![Graduation](public/demo-photos/graduation-selfie.jpg) | ![Road trip](public/demo-photos/road-trip-candid.jpg) |
+| School photo (1998) | Birthday party (1998) | Graduation selfie | Road trip candid |
+| ![Party](public/demo-photos/party-group-selfie.jpg) | ![Embarrassing](public/demo-photos/embarrassing-friend-photo.jpg) | ![Wedding](public/demo-photos/wedding-formal.jpg) | ![Hiking](public/demo-photos/hiking-summit.jpg) |
+| Party group selfie | "Thanks, Marco" | Wedding guest | Summit triumph |
+
+## Features
+
+- 🎙️ **AI Biographer** — warm, empathetic interviewer that draws your story out one question at a time
+- ⚡ **Streaming Responses** — token-by-token rendering with blinking cursor and stop button
+- 🏠 **Room System** — shareable room codes, each room has its own timeline and contributors
+- 👥 **Contributor Identity** — pick a name and color, see who contributed what
+- 💬 **Comments & Corrections** — inline threads on events, "Corrected 3 times" badges with history
+- 📷 **Photo Upload** — attach photos to events, see who uploaded each one
+- 🟢 **Live Presence** — see who's online in real-time via SSE
+- 📅 **Auto Event Extraction** — structured JSON extraction detects life events from natural conversation
+- 🖼️ **Photo Analysis** — upload a photo, AI describes the memory and adds it to the timeline
+- 🔊 **Text-to-Speech** — hear the biographer's responses in 5 selectable voices
+- ✨ **Drag & Reorder** — rearrange timeline events with smooth motion animations
+- 🌓 **Light/Dark Mode** — polished oklch color palette for both themes
+- 📥 **Export** — download your timeline as a text file
+- 🎊 **Confetti** — because every memory deserves a celebration
 
 ## Tech Stack
 
@@ -48,38 +79,33 @@ Under the hood: Gemini 2.5 Flash handles the interview, event extraction (via st
 | **Animation** | Motion (Framer Motion successor) — drag-and-drop reorder, page transitions |
 | **AI** | Gemini 2.5 Flash (chat, image analysis, TTS) via `@google/genai` |
 | **Fonts** | Merriweather, Source Serif 4, JetBrains Mono |
-| **Real-time** | Server-Sent Events for multi-tab/multi-user sync |
+| **Real-time** | Server-Sent Events for room-scoped multi-user sync |
 | **Other** | canvas-confetti, react-markdown, lucide-react |
-
-## Features
-
-- 🎙️ **AI Interviewer** — warm, empathetic biographer that draws out your story one question at a time
-- 📅 **Auto Event Extraction** — structured JSON extraction detects life events from natural conversation
-- 🖼️ **Photo Analysis** — upload a photo, AI describes the memory and adds it to the timeline
-- 🔊 **Text-to-Speech** — hear the biographer's responses in 5 selectable voices
-- 🔄 **Real-time Sync** — SSE-based broadcasting keeps multiple tabs/users in sync
-- ✨ **Drag & Reorder** — rearrange timeline events with smooth motion animations
-- 🌓 **Light/Dark Mode** — polished oklch color palette for both themes
-- 📥 **Export** — download your timeline as a text file
-- 🎊 **Confetti** — because every memory deserves a celebration
 
 ## Architecture
 
 ```
 app/
-  layout.tsx          — Root layout, fonts, dark-mode hydration
-  page.tsx            — Split-pane (desktop) / tabbed (mobile) layout
-  globals.css         — Tailwind v4 config, oklch design tokens
-  api/events/route.ts — SSE endpoint + CRUD (in-memory + file persistence)
+  page.tsx                      — Landing page (create/join rooms)
+  layout.tsx                    — Root layout, fonts, dark-mode hydration
+  globals.css                   — Tailwind v4 config, oklch design tokens
+  room/[roomId]/page.tsx        — Room-scoped app (chat + timeline + collaboration)
+  api/rooms/[roomId]/events/    — Per-room SSE + CRUD API
+  api/events/                   — Legacy SSE endpoint
 
 components/
-  Chat.tsx            — AI interview chat with TTS, settings, event extraction
-  Timeline.tsx        — Draggable timeline with reorder, inline editing, delete
-  ImageAnalyzer.tsx   — Photo upload → AI analysis → timeline event
-  ThemeToggle.tsx     — Animated light/dark toggle
+  Chat.tsx                      — AI interview with streaming, TTS, event extraction
+  Timeline.tsx                  — Draggable timeline with comments, photos, corrections
+  ContributorIdentity.tsx       — Name/color picker modal + useContributor hook
+  ContributorPanel.tsx          — Slide-out contributor presence sidebar
+  EventComments.tsx             — Inline comment threads with correction tracking
+  PhotoGallery.tsx              — Photo strip thumbnails + full lightbox viewer
+  ImageAnalyzer.tsx             — Photo upload → AI analysis → timeline event
+  ThemeToggle.tsx               — Animated light/dark toggle
 
 lib/
-  gemini.ts           — AI client, system prompt, image analysis, TTS
+  types.ts                      — Shared TypeScript interfaces (LifeEvent, Contributor, etc.)
+  gemini.ts                     — AI client, streaming, system prompt, image analysis, TTS
 ```
 
 ## License
