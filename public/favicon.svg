@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#6b8f3c"/>
+      <stop offset="100%" stop-color="#a3c060"/>
+    </linearGradient>
+  </defs>
+  <rect width="32" height="32" rx="8" fill="url(#g)"/>
+  <!-- Book/timeline icon -->
+  <path d="M8 7h12a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H8V7z" fill="none" stroke="#fff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+  <line x1="12" y1="7" x2="12" y2="25" stroke="#fff" stroke-width="1.5"/>
+  <!-- Timeline dots -->
+  <circle cx="12" cy="12" r="1.5" fill="#fff"/>
+  <circle cx="12" cy="17" r="1.5" fill="#fff"/>
+  <circle cx="12" cy="22" r="1.5" fill="#fff"/>
+  <!-- Story lines -->
+  <line x1="15" y1="12" x2="19" y2="12" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+  <line x1="15" y1="17" x2="20" y2="17" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+  <line x1="15" y1="22" x2="18" y2="22" stroke="#fff" stroke-width="1" stroke-linecap="round" opacity="0.8"/>
+</svg>
