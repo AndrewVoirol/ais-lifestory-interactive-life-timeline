@@ -1,31 +1,34 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Send, User, Bot, Volume2, Loader2, ImagePlus, Settings, X } from 'lucide-react';
-import { getAI, INTERVIEW_SYSTEM_PROMPT, generateSpeech } from '@/lib/gemini';
+import { Send, User, Bot, Volume2, Loader2, ImagePlus, Settings, X, Square, MessageCircle } from 'lucide-react';
+import { getAI, INTERVIEW_SYSTEM_PROMPT, generateSpeech, streamChatResponse, extractEventsFromText } from '@/lib/gemini';
 import ReactMarkdown from 'react-markdown';
-
-interface Message {
-  role: 'user' | 'bot';
-  content: string;
-}
+import type { ChatMessage, LifeEvent, Contributor } from '@/lib/types';
 
 interface ChatProps {
   onEventDetected: (event: { title: string; description: string; date: string }) => void;
   onImageClick: () => void;
-  events: any[];
-  onEventUpdated: (event: any) => void;
+  events: LifeEvent[];
+  onEventUpdated: (event: LifeEvent) => void;
+  contributorName?: string;
+  contributorColor?: string;
 }
 
 const VOICES = ['Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'];
 
-export default function Chat({ onEventDetected, onImageClick, events, onEventUpdated }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    { role: 'bot', content: "Hello! I'm your personal biographer. I'd love to help you document your journey. Shall we start at the very beginning? Where were you born, or what is your earliest memory?" }
+export default function Chat({ onEventDetected, onImageClick, events, onEventUpdated, contributorName, contributorColor }: ChatProps) {
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    { 
+      role: 'bot', 
+      content: "Hello! I'm your personal biographer. I'd love to help you document your journey. Shall we start at the very beginning? Where were you born, or what is your earliest memory?",
+      timestamp: Date.now(),
+    }
   ]);
   const [input, setInput] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingText, setStreamingText] = useState('');
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [voice, setVoice] = useState('Kore');
@@ -34,25 +37,35 @@ export default function Chat({ onEventDetected, onImageClick, events, onEventUpd
   
   const scrollRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<any>(null);
+  const abortRef = useRef(false);
 
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, streamingText]);
 
   const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+    if (!input.trim() || isStreaming) return;
 
     const userMessage = input.trim();
     setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setIsLoading(true);
+    
+    const userMsg: ChatMessage = { 
+      role: 'user', 
+      content: userMessage,
+      contributorName,
+      contributorColor,
+      timestamp: Date.now(),
+    };
+    setMessages(prev => [...prev, userMsg]);
+    setIsStreaming(true);
+    setStreamingText('');
+    abortRef.current = false;
 
     try {
-      const ai = getAI();
       if (!chatRef.current) {
-        chatRef.current = ai.chats.create({
+        chatRef.current = getAI().chats.create({
           model: "gemini-2.5-flash",
           config: {
             systemInstruction: INTERVIEW_SYSTEM_PROMPT,
@@ -60,70 +73,83 @@ export default function Chat({ onEventDetected, onImageClick, events, onEventUpd
         });
       }
 
-      let messageToSend = userMessage;
-      
-      // Inject current timeline context
+      // Build timeline context
       const timelineContext = events.length > 0 
         ? `\n\n[CURRENT TIMELINE: ${JSON.stringify(events.map(e => ({ title: e.title, date: e.date, id: e.id })))}]`
         : "";
-      messageToSend += timelineContext;
 
-      if (conversationMode) {
-        messageToSend += "\n\n[SYSTEM NOTE: Conversation Mode is ENABLED. Keep your response concise (under 3 sentences), friendly, and conversational. If extracting an event, keep the description brief. Ensure JSON format remains valid.]";
+      // Add contributor context
+      const contributorContext = contributorName 
+        ? `\n\n[CONTRIBUTOR: ${contributorName} is speaking]` 
+        : "";
+
+      let fullText = '';
+
+      // Stream the response
+      const stream = streamChatResponse(
+        chatRef.current,
+        userMessage + contributorContext,
+        timelineContext,
+        conversationMode
+      );
+
+      for await (const chunk of stream) {
+        if (abortRef.current) break;
+        fullText += chunk;
+        // Show text but hide event tags while streaming
+        const displayText = fullText
+          .replace(/\[EVENT_DETECTED:\s*{[^}]*}\]/g, '')
+          .replace(/\[EVENT_UPDATED:\s*{[^}]*}\]/g, '')
+          .trim();
+        setStreamingText(displayText);
       }
 
-      const response = await chatRef.current.sendMessage({ message: messageToSend });
-      const text = response.text || "";
+      // Extract events from completed text
+      const { cleanText, detectedEvents, updatedEvents } = extractEventsFromText(fullText);
 
-      // Extract events
-      const eventRegex = /\[EVENT_DETECTED:\s*({.*?})\]/g;
-      const updateRegex = /\[EVENT_UPDATED:\s*({.*?})\]/g;
-      
-      let match;
-      let cleanText = text;
-      
-      // Handle new events
-      while ((match = eventRegex.exec(text)) !== null) {
-        try {
-          const eventData = JSON.parse(match[1]);
-          onEventDetected(eventData);
-          cleanText = cleanText.replace(match[0], '');
-        } catch (e) {
-          console.error("Failed to parse event data", e);
+      // Add the final bot message
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        content: cleanText,
+        timestamp: Date.now(),
+      }]);
+      setStreamingText('');
+
+      // Process detected events
+      for (const eventData of detectedEvents) {
+        onEventDetected(eventData);
+      }
+
+      // Process updates
+      for (const updateData of updatedEvents) {
+        const eventToUpdate = events.find(e => 
+          (updateData.id && e.id === updateData.id) || 
+          (updateData.originalTitle && e.title.toLowerCase().includes(updateData.originalTitle.toLowerCase()))
+        );
+        if (eventToUpdate) {
+          onEventUpdated({
+            ...eventToUpdate,
+            date: updateData.date || eventToUpdate.date,
+            description: updateData.description || eventToUpdate.description,
+          });
         }
       }
-
-      // Handle updates
-      while ((match = updateRegex.exec(text)) !== null) {
-        try {
-          const updateData = JSON.parse(match[1]);
-          // Find event by ID if provided, or fuzzy match title
-          const eventToUpdate = events.find(e => 
-            (updateData.id && e.id === updateData.id) || 
-            (updateData.originalTitle && e.title.toLowerCase().includes(updateData.originalTitle.toLowerCase()))
-          );
-
-          if (eventToUpdate) {
-            onEventUpdated({
-              ...eventToUpdate,
-              date: updateData.date || eventToUpdate.date,
-              description: updateData.description || eventToUpdate.description
-            });
-            cleanText = cleanText.replace(match[0], '');
-          }
-        } catch (e) {
-          console.error("Failed to parse update data", e);
-        }
-      }
-
-      setMessages(prev => [...prev, { role: 'bot', content: cleanText.trim() }]);
     } catch (error) {
       console.error("Chat error:", error);
-      setMessages(prev => [...prev, { role: 'bot', content: "I'm sorry, I encountered an error. Could you try again?" }]);
+      setMessages(prev => [...prev, { 
+        role: 'bot', 
+        content: "I'm sorry, I encountered an error. Could you try again?",
+        timestamp: Date.now(),
+      }]);
+      setStreamingText('');
     } finally {
-      setIsLoading(false);
+      setIsStreaming(false);
     }
   };
+
+  const handleStop = useCallback(() => {
+    abortRef.current = true;
+  }, []);
 
   const handleTTS = async (text: string) => {
     if (isSpeaking) return;
@@ -242,40 +268,88 @@ export default function Chat({ onEventDetected, onImageClick, events, onEventUpd
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
             >
               <div className={`max-w-[85%] flex gap-3 ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                {/* Avatar */}
                 <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                  msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-secondary text-secondary-foreground'
-                }`}>
-                  {msg.role === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
-                </div>
-                <div className={`p-3 rounded-2xl relative group ${
                   msg.role === 'user' 
-                    ? 'bg-primary text-primary-foreground rounded-tr-none' 
-                    : 'bg-secondary text-secondary-foreground rounded-tl-none'
-                }`}>
-                  <div className="prose dark:prose-invert prose-sm">
-                    <ReactMarkdown>{msg.content}</ReactMarkdown>
-                  </div>
-                  {msg.role === 'bot' && (
-                    <button 
-                      onClick={() => handleTTS(msg.content)}
-                      disabled={isSpeaking}
-                      className="absolute -right-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-primary disabled:opacity-50"
-                    >
-                      {isSpeaking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
-                    </button>
+                    ? '' 
+                    : 'bg-secondary text-secondary-foreground'
+                }`}
+                  style={msg.role === 'user' && msg.contributorColor 
+                    ? { backgroundColor: msg.contributorColor, color: 'white' } 
+                    : msg.role === 'user' 
+                      ? { backgroundColor: 'var(--primary)', color: 'var(--primary-foreground)' }
+                      : undefined
+                  }
+                >
+                  {msg.role === 'user' ? (
+                    msg.contributorName 
+                      ? <span className="text-xs font-bold">{msg.contributorName[0].toUpperCase()}</span>
+                      : <User className="w-4 h-4" />
+                  ) : (
+                    <Bot className="w-4 h-4" />
                   )}
+                </div>
+
+                {/* Message bubble */}
+                <div className="flex flex-col gap-1">
+                  {msg.role === 'user' && msg.contributorName && (
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider text-right">
+                      {msg.contributorName}
+                    </span>
+                  )}
+                  <div className={`p-3 rounded-2xl relative group ${
+                    msg.role === 'user' 
+                      ? 'bg-primary text-primary-foreground rounded-tr-none' 
+                      : 'bg-secondary text-secondary-foreground rounded-tl-none'
+                  }`}>
+                    <div className="prose dark:prose-invert prose-sm">
+                      <ReactMarkdown>{msg.content}</ReactMarkdown>
+                    </div>
+                    {msg.role === 'bot' && (
+                      <button 
+                        onClick={() => handleTTS(msg.content)}
+                        disabled={isSpeaking}
+                        className="absolute -right-8 top-0 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:text-primary disabled:opacity-50"
+                      >
+                        {isSpeaking ? <Loader2 className="w-4 h-4 animate-spin" /> : <Volume2 className="w-4 h-4" />}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </motion.div>
           ))}
         </AnimatePresence>
-        {isLoading && (
-          <div className="flex justify-start">
-            <div className="bg-secondary p-3 rounded-2xl rounded-tl-none flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary" />
-              <span className="text-sm text-muted-foreground">Thinking...</span>
+
+        {/* Streaming response */}
+        {isStreaming && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="flex justify-start"
+          >
+            <div className="max-w-[85%] flex gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-secondary text-secondary-foreground">
+                <Bot className="w-4 h-4" />
+              </div>
+              <div className="p-3 rounded-2xl rounded-tl-none bg-secondary text-secondary-foreground">
+                {streamingText ? (
+                  <div className="prose dark:prose-invert prose-sm">
+                    <ReactMarkdown>{streamingText}</ReactMarkdown>
+                    <span className="inline-block w-0.5 h-4 bg-primary animate-pulse ml-0.5 align-text-bottom" />
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <span className="flex gap-1">
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '0ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '150ms' }} />
+                      <span className="w-2 h-2 rounded-full bg-primary/60 animate-bounce" style={{ animationDelay: '300ms' }} />
+                    </span>
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
+          </motion.div>
         )}
       </div>
 
@@ -288,16 +362,28 @@ export default function Chat({ onEventDetected, onImageClick, events, onEventUpd
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            placeholder="Type your story..."
+            placeholder={contributorName ? `${contributorName}, share a memory...` : "Type your story..."}
             className="flex-1 bg-background border border-border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
+            disabled={isStreaming}
           />
-          <button
-            type="submit"
-            disabled={isLoading || !input.trim()}
-            className="bg-primary text-primary-foreground p-2 rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
-          >
-            <Send className="w-5 h-5" />
-          </button>
+          {isStreaming ? (
+            <button
+              type="button"
+              onClick={handleStop}
+              className="bg-destructive text-destructive-foreground p-2 rounded-full hover:scale-105 active:scale-95 transition-all"
+              title="Stop generating"
+            >
+              <Square className="w-5 h-5" />
+            </button>
+          ) : (
+            <button
+              type="submit"
+              disabled={!input.trim()}
+              className="bg-primary text-primary-foreground p-2 rounded-full hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:hover:scale-100"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          )}
         </form>
       </div>
     </div>
