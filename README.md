@@ -1,4 +1,4 @@
-![LifeStory — collaborative memory timeline with AI biographer](screenshots/room-chat.png)
+![LifeStory demo — AI interview, timeline extraction, real-time collaboration](screenshots/demo.gif)
 
 # LifeStory
 
@@ -37,20 +37,9 @@ Under the hood: Gemini 2.5 Flash handles the interview, event extraction (struct
 
 ## Screenshots
 
-| Landing | Join a Room | In the Room |
-|:---:|:---:|:---:|
-| ![Landing page — Start or join a story](screenshots/landing-page.png) | ![Contributor identity — pick name and color](screenshots/contributor-modal.png) | ![Room — chat with biographer, events on timeline](screenshots/room-chat.png) |
-
-## Demo Photos
-
-The app ships with 8 sample photos of a character "Alex" across life stages — the kind of photos that surface when friends and family start arguing about what really happened.
-
-| | | | |
+| Landing | How It Works | Join a Room | In the Room |
 |:---:|:---:|:---:|:---:|
-| ![School photo](public/demo-photos/childhood-school-photo.jpg) | ![Birthday](public/demo-photos/childhood-birthday.jpg) | ![Graduation](public/demo-photos/graduation-selfie.jpg) | ![Road trip](public/demo-photos/road-trip-candid.jpg) |
-| School photo (1998) | Birthday party (1998) | Graduation selfie | Road trip candid |
-| ![Party](public/demo-photos/party-group-selfie.jpg) | ![Embarrassing](public/demo-photos/embarrassing-friend-photo.jpg) | ![Wedding](public/demo-photos/wedding-formal.jpg) | ![Hiking](public/demo-photos/hiking-summit.jpg) |
-| Party group selfie | "Thanks, Marco" | Wedding guest | Summit triumph |
+| ![Landing page — hero](screenshots/landing-page.png) | ![How It Works — AI interview + friend collaboration](screenshots/landing-narrative.png) | ![Contributor identity modal](screenshots/contributor-modal.png) | ![Room — biographer chat + timeline](screenshots/room-chat.png) |
 
 ## Features
 
@@ -91,7 +80,6 @@ app/
   globals.css                   — Tailwind v4 config, oklch design tokens
   room/[roomId]/page.tsx        — Room-scoped app (chat + timeline + collaboration)
   api/rooms/[roomId]/events/    — Per-room SSE + CRUD API
-  api/events/                   — Legacy SSE endpoint
 
 components/
   Chat.tsx                      — AI interview with streaming, TTS, event extraction

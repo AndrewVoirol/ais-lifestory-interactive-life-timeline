@@ -147,6 +147,11 @@
   @apply bg-card/50 backdrop-blur-md border border-border rounded-2xl;
 }
 
+.pov-label {
+  @apply text-[9px] font-bold uppercase tracking-wider text-white/90;
+  @apply bg-white/10 backdrop-blur-sm px-2.5 py-1 rounded-full border border-white/20;
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
   width: 8px;

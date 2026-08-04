@@ -1,8 +1,5 @@
-node_modules/
-.next/
-coverage/
+node_modules
+.next
+.env.local
 .DS_Store
-*.log
-.env*
-!.env.example
-data/rooms/
+data/rooms/*.json
