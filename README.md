@@ -37,9 +37,13 @@ Under the hood: Gemini 2.5 Flash handles the interview, event extraction (struct
 
 ## Screenshots
 
-| Landing | How It Works | Join a Room | In the Room |
-|:---:|:---:|:---:|:---:|
-| ![Landing page — hero](screenshots/landing-page.png) | ![How It Works — AI interview + friend collaboration](screenshots/landing-narrative.png) | ![Contributor identity modal](screenshots/contributor-modal.png) | ![Room — biographer chat + timeline](screenshots/room-chat.png) |
+| Landing Page | How It Works |
+|:---:|:---:|
+| ![Landing page — Start or join a story](screenshots/landing-page.png) | ![How It Works — AI interview + friend collaboration](screenshots/landing-narrative.png) |
+
+| Join a Room | In the Room (with photos) |
+|:---:|:---:|
+| ![Contributor identity — pick name and color](screenshots/contributor-modal.png) | ![Room — timeline with photo evidence, comments, corrections](screenshots/room-with-photos.png) |
 
 ## Features
 

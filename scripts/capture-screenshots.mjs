@@ -1,13 +1,13 @@
 /**
  * Capture screenshots for the LifeStory README.
- * 
+ *
  * Usage: node scripts/capture-screenshots.mjs
- * 
+ *
  * Produces:
  *   screenshots/landing-page.png      — above-the-fold hero
  *   screenshots/landing-narrative.png  — "How It Works" section with demo photos
  *   screenshots/contributor-modal.png  — room page with identity modal open
- *   screenshots/room-chat.png          — room with pre-seeded events and chat
+ *   screenshots/room-with-photos.png   — room with events that have photos attached
  */
 
 import { chromium } from 'playwright';
@@ -18,41 +18,111 @@ const BASE_URL = 'http://localhost:3000';
 const SCREENSHOTS_DIR = path.join(process.cwd(), 'screenshots');
 const ROOM_ID = 'demo-screenshots';
 
-// Pre-seed room events via the API
+/** Read a demo photo and return a base64 data URL */
+function photoToDataUrl(filename) {
+  const filePath = path.join(process.cwd(), 'public', 'demo-photos', filename);
+  const buf = fs.readFileSync(filePath);
+  return `data:image/jpeg;base64,${buf.toString('base64')}`;
+}
+
 async function seedRoom() {
+  // Read actual demo photos as base64
+  const schoolPhotoData = photoToDataUrl('childhood-school-photo.jpg');
+  const birthdayData = photoToDataUrl('childhood-birthday.jpg');
+  const roadtripAlexData = photoToDataUrl('roadtrip-alex-selfie.jpg');
+  const roadtripMarcoData = photoToDataUrl('roadtrip-marco-backseat.jpg');
+  const partyAlexData = photoToDataUrl('party-alex-group.jpg');
+  const partyMarcoData = photoToDataUrl('party-marco-aftermath.jpg');
+
   const events = [
     {
       id: 'evt-birth',
-      title: 'Birth',
-      description: 'Born in San Francisco.',
+      title: 'Born in San Francisco',
+      description: 'Born at UCSF Medical Center in the heart of the city.',
       date: '1992',
       contributedBy: 'Alex',
       contributorColor: '#3d85c6',
       contributorId: 'alex-001',
     },
     {
-      id: 'evt-fog',
-      title: 'Watching Fog Over Golden Gate Bridge',
-      description: 'Earliest memory of watching the fog roll in over the Golden Gate Bridge from the kitchen window.',
-      date: 'Early Childhood',
-      contributedBy: 'Alex',
-      contributorColor: '#3d85c6',
-      contributorId: 'alex-001',
-    },
-    {
-      id: 'evt-giants',
-      title: 'Giants Games at Candlestick Park with Dad',
-      description: "Alex's dad would take them to watch the Giants play at Candlestick Park in the summer, creating some of Alex's favorite childhood memories.",
+      id: 'evt-school',
+      title: 'School Picture Day',
+      description: '3rd grade picture day at Lincoln Elementary. Mom picked out the blue polo.',
       date: '1998',
       contributedBy: 'Alex',
       contributorColor: '#3d85c6',
       contributorId: 'alex-001',
+      photos: [
+        {
+          id: 'photo-school',
+          dataUrl: schoolPhotoData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'School picture day — 3rd grade',
+          timestamp: Date.now() - 120000,
+        },
+      ],
+    },
+    {
+      id: 'evt-birthday',
+      title: 'Birthday Party at Home',
+      description: "Alex's 6th birthday party in the backyard. Mom got a disposable camera for the occasion.",
+      date: '1998',
+      contributedBy: 'Sarah',
+      contributorColor: '#81b29a',
+      contributorId: 'sarah-001',
+      photos: [
+        {
+          id: 'photo-bday',
+          dataUrl: birthdayData,
+          uploadedBy: 'Sarah',
+          uploadedByColor: '#81b29a',
+          caption: 'Birthday party — disposable camera',
+          timestamp: Date.now() - 110000,
+        },
+      ],
       comments: [
         {
-          id: 'cmt-1',
+          id: 'cmt-bday',
+          contributorName: 'Alex',
+          contributorColor: '#3d85c6',
+          content: "I completely forgot about this party! Mom still has that camera somewhere.",
+          timestamp: Date.now() - 100000,
+        },
+      ],
+    },
+    {
+      id: 'evt-roadtrip',
+      title: 'Road Trip to Yosemite',
+      description: 'Drove up Highway 120 with Marco. Stopped at every gas station. Got lost twice.',
+      date: 'Summer 2015',
+      contributedBy: 'Alex',
+      contributorColor: '#3d85c6',
+      contributorId: 'alex-001',
+      photos: [
+        {
+          id: 'photo-road-alex',
+          dataUrl: roadtripAlexData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'The Instagram-worthy version',
+          timestamp: Date.now() - 80000,
+        },
+        {
+          id: 'photo-road-marco',
+          dataUrl: roadtripMarcoData,
+          uploadedBy: 'Marco',
+          uploadedByColor: '#e07a5f',
+          caption: 'The actual road trip experience',
+          timestamp: Date.now() - 70000,
+        },
+      ],
+      comments: [
+        {
+          id: 'cmt-road',
           contributorName: 'Marco',
           contributorColor: '#e07a5f',
-          content: "Dude, that was 1997 — I have the ticket stub. We sat in the nosebleeds.",
+          content: "You forgot to mention the 3 gas station burritos. I have photographic evidence.",
           timestamp: Date.now() - 60000,
           isCorrection: true,
         },
@@ -62,15 +132,41 @@ async function seedRoom() {
           contributorName: 'Marco',
           contributorColor: '#e07a5f',
           field: 'date',
-          oldValue: '1998',
-          newValue: '1997',
+          oldValue: 'Summer 2016',
+          newValue: 'Summer 2015',
           timestamp: Date.now() - 60000,
+        },
+      ],
+    },
+    {
+      id: 'evt-party',
+      title: 'The Infamous House Party',
+      description: "Alex remembers string lights and a great playlist. Marco remembers cleaning the kitchen until 4am.",
+      date: 'New Year\'s 2019',
+      contributedBy: 'Alex',
+      contributorColor: '#3d85c6',
+      contributorId: 'alex-001',
+      photos: [
+        {
+          id: 'photo-party-alex',
+          dataUrl: partyAlexData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'Everyone at their best',
+          timestamp: Date.now() - 40000,
+        },
+        {
+          id: 'photo-party-marco',
+          dataUrl: partyMarcoData,
+          uploadedBy: 'Marco',
+          uploadedByColor: '#e07a5f',
+          caption: 'The version Alex tried to delete',
+          timestamp: Date.now() - 30000,
         },
       ],
     },
   ];
 
-  // Seed each event
   for (const event of events) {
     await fetch(`${BASE_URL}/api/rooms/${ROOM_ID}/events`, {
       method: 'POST',
@@ -79,7 +175,6 @@ async function seedRoom() {
     });
   }
 
-  // Join contributors for presence
   const contributors = [
     { id: 'alex-001', name: 'Alex', color: '#3d85c6', isSubject: true, lastSeen: Date.now(), isOnline: true },
     { id: 'marco-001', name: 'Marco', color: '#e07a5f', isSubject: false, lastSeen: Date.now(), isOnline: true },
@@ -94,7 +189,7 @@ async function seedRoom() {
     });
   }
 
-  console.log(`Seeded room "${ROOM_ID}" with ${events.length} events and ${contributors.length} contributors.`);
+  console.log(`Seeded room "${ROOM_ID}" with ${events.length} events (with photos) and ${contributors.length} contributors.`);
 }
 
 async function main() {
@@ -102,7 +197,6 @@ async function main() {
     fs.mkdirSync(SCREENSHOTS_DIR, { recursive: true });
   }
 
-  // Seed the demo room
   await seedRoom();
 
   const browser = await chromium.launch({ headless: true });
@@ -124,16 +218,13 @@ async function main() {
 
   // ── Screenshot 2: Narrative section (scroll down) ──
   console.log('Capturing narrative section...');
-  // Scroll to the "How It Works" section to trigger whileInView animations
   await landingPage.evaluate(() => {
     const sections = document.querySelectorAll('section');
-    // The narrative section is the second <section> (after the hero)
     if (sections.length >= 2) {
       sections[1].scrollIntoView({ behavior: 'instant', block: 'start' });
     }
   });
-  await landingPage.waitForTimeout(1500); // Wait for whileInView animations to play
-  // Wait for images to load
+  await landingPage.waitForTimeout(1500);
   await landingPage.waitForFunction(() => {
     const imgs = document.querySelectorAll('img');
     return Array.from(imgs).every(img => img.complete && img.naturalWidth > 0);
@@ -155,8 +246,8 @@ async function main() {
   console.log('  ✓ contributor-modal.png');
   await modalPage.close();
 
-  // ── Screenshot 4: Room with chat ──
-  console.log('Capturing room with chat...');
+  // ── Screenshot 4: Room with photos on timeline ──
+  console.log('Capturing room with photos...');
   const roomPage = await context.newPage();
   await roomPage.addInitScript(() => {
     localStorage.setItem('contributor-id', 'alex-001');
@@ -165,11 +256,20 @@ async function main() {
     localStorage.setItem('contributor-is-subject', 'true');
   });
   await roomPage.goto(`${BASE_URL}/room/${ROOM_ID}`, { waitUntil: 'networkidle' });
-  await roomPage.waitForTimeout(2500);
+  await roomPage.waitForTimeout(3000);
+
+  // Click on Timeline tab to show it's populated with photos
+  const timelineTab = roomPage.locator('button:has-text("Timeline")').first();
+  if (await timelineTab.isVisible()) {
+    // Desktop: already split view — both chat and timeline visible
+  }
+
+  // Wait for photo thumbnails to render (base64 images)
+  await roomPage.waitForTimeout(1000);
   await roomPage.screenshot({
-    path: path.join(SCREENSHOTS_DIR, 'room-chat.png'),
+    path: path.join(SCREENSHOTS_DIR, 'room-with-photos.png'),
   });
-  console.log('  ✓ room-chat.png');
+  console.log('  ✓ room-with-photos.png');
   await roomPage.close();
 
   await browser.close();

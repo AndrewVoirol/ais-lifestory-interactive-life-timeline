@@ -2,14 +2,12 @@
  * Capture demo GIF frames for the LifeStory README.
  *
  * Choreography:
- *   1. Landing page hero
- *   2. Click "Start a Story" → room loads with contributor modal
- *   3. Fill in name "Alex", pick color, check "I am the subject", join
- *   4. Room view — biographer greeting visible
- *   5. Type a memory into the chat
- *   6. Wait for AI to stream a response + event extraction
- *   7. Timeline event appears
- *   8. Pause — then show second tab (Marco joins, photo uploaded)
+ *   Act 1: Landing page hero (1.5s)
+ *   Act 2: Click "Start a Story" → contributor modal → fill name → join (3s)
+ *   Act 3: Chat with biographer — type message → AI streams response → event appears (8s)
+ *   Act 4: Show room with photo-rich timeline (pre-seeded, photo thumbnails visible) (2s)
+ *   Act 5: Upload a photo via the Image Analyzer modal (2s)
+ *   Act 6: Second contributor joins — presence updates (1.5s)
  *
  * Usage: node scripts/capture-gif-frames.mjs
  * Then:  ffmpeg -framerate 10 -i screenshots/frames/frame_%04d.png \
@@ -23,7 +21,7 @@ import path from 'path';
 
 const BASE_URL = 'http://localhost:3000';
 const FRAMES_DIR = path.join(process.cwd(), 'screenshots', 'frames');
-const ROOM_ID = 'demo-gif-room';
+const PHOTO_ROOM = 'demo-gif-photos';
 
 let frameIndex = 0;
 
@@ -36,8 +34,21 @@ async function captureFrame(page, label, holdFrames = 1) {
   console.log(`  Frame ${frameIndex}: ${label}${holdFrames > 1 ? ` (held ${holdFrames}x)` : ''}`);
 }
 
-// Pre-seed events so the GIF shows a populated room
-async function seedRoom() {
+/** Read a demo photo and return a base64 data URL */
+function photoToDataUrl(filename) {
+  const filePath = path.join(process.cwd(), 'public', 'demo-photos', filename);
+  const buf = fs.readFileSync(filePath);
+  return `data:image/jpeg;base64,${buf.toString('base64')}`;
+}
+
+/** Pre-seed a room with photo-rich events */
+async function seedPhotoRoom() {
+  const schoolPhotoData = photoToDataUrl('childhood-school-photo.jpg');
+  const roadtripAlexData = photoToDataUrl('roadtrip-alex-selfie.jpg');
+  const roadtripMarcoData = photoToDataUrl('roadtrip-marco-backseat.jpg');
+  const partyAlexData = photoToDataUrl('party-alex-group.jpg');
+  const partyMarcoData = photoToDataUrl('party-marco-aftermath.jpg');
+
   const events = [
     {
       id: 'gif-evt-1',
@@ -50,48 +61,118 @@ async function seedRoom() {
     },
     {
       id: 'gif-evt-2',
-      title: 'First Day at Lincoln Elementary',
-      description: 'Walked to school with Dad. Made friends with Marco on the playground — he shared his fruit snacks.',
+      title: 'School Picture Day',
+      description: '3rd grade picture day at Lincoln Elementary.',
       date: '1998',
       contributedBy: 'Alex',
       contributorColor: '#3d85c6',
       contributorId: 'alex-gif',
+      photos: [
+        {
+          id: 'gif-photo-1',
+          dataUrl: schoolPhotoData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'School picture day',
+          timestamp: Date.now() - 60000,
+        },
+      ],
     },
     {
       id: 'gif-evt-3',
       title: 'Road Trip to Yosemite',
-      description: 'Drove up Highway 120 with Marco. Alex took the Instagram-worthy selfie. Marco documented the snack debris.',
+      description: 'Drove up Highway 120 with Marco. Got lost twice. Best trip ever.',
       date: 'Summer 2015',
-      contributedBy: 'Marco',
-      contributorColor: '#e07a5f',
-      contributorId: 'marco-gif',
+      contributedBy: 'Alex',
+      contributorColor: '#3d85c6',
+      contributorId: 'alex-gif',
+      photos: [
+        {
+          id: 'gif-photo-2',
+          dataUrl: roadtripAlexData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'The Instagram version',
+          timestamp: Date.now() - 50000,
+        },
+        {
+          id: 'gif-photo-3',
+          dataUrl: roadtripMarcoData,
+          uploadedBy: 'Marco',
+          uploadedByColor: '#e07a5f',
+          caption: 'The reality version',
+          timestamp: Date.now() - 40000,
+        },
+      ],
       comments: [
         {
           id: 'gif-cmt-1',
           contributorName: 'Marco',
           contributorColor: '#e07a5f',
-          content: "You forgot to mention the 3 gas station burritos. I have photographic evidence.",
+          content: "You forgot about the 3 gas station burritos.",
           timestamp: Date.now() - 30000,
+          isCorrection: true,
+        },
+      ],
+    },
+    {
+      id: 'gif-evt-4',
+      title: 'The Infamous House Party',
+      description: "String lights, great playlist, and a kitchen that needed 4 hours of cleanup.",
+      date: "New Year's 2019",
+      contributedBy: 'Marco',
+      contributorColor: '#e07a5f',
+      contributorId: 'marco-gif',
+      photos: [
+        {
+          id: 'gif-photo-4',
+          dataUrl: partyAlexData,
+          uploadedBy: 'Alex',
+          uploadedByColor: '#3d85c6',
+          caption: 'Everyone at their best',
+          timestamp: Date.now() - 20000,
+        },
+        {
+          id: 'gif-photo-5',
+          dataUrl: partyMarcoData,
+          uploadedBy: 'Marco',
+          uploadedByColor: '#e07a5f',
+          caption: 'The version Alex tried to delete',
+          timestamp: Date.now() - 10000,
         },
       ],
     },
   ];
 
   for (const event of events) {
-    await fetch(`${BASE_URL}/api/rooms/${ROOM_ID}/events`, {
+    await fetch(`${BASE_URL}/api/rooms/${PHOTO_ROOM}/events`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ type: 'add', payload: event }),
     });
   }
+
+  // Join Alex
+  await fetch(`${BASE_URL}/api/rooms/${PHOTO_ROOM}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'join',
+      payload: { id: 'alex-gif', name: 'Alex', color: '#3d85c6', isSubject: true, lastSeen: Date.now(), isOnline: true },
+    }),
+  });
+
+  console.log(`Seeded photo room "${PHOTO_ROOM}" with ${events.length} events and photos.`);
 }
 
 async function main() {
-  // Clean and create frames dir
   if (fs.existsSync(FRAMES_DIR)) {
     fs.rmSync(FRAMES_DIR, { recursive: true });
   }
   fs.mkdirSync(FRAMES_DIR, { recursive: true });
+
+  // Seed the photo-rich room
+  await seedPhotoRoom();
 
   const browser = await chromium.launch({ headless: true });
   const context = await browser.newContext({
@@ -107,7 +188,7 @@ async function main() {
   const page = await context.newPage();
   await page.goto(BASE_URL, { waitUntil: 'networkidle' });
   await page.waitForTimeout(1200);
-  await captureFrame(page, 'Landing page hero', 15); // Hold 1.5s at 10fps
+  await captureFrame(page, 'Landing page hero', 15);
 
   // ════════════════════════════════════════
   // ACT 2: Enter a room — contributor modal
@@ -120,7 +201,7 @@ async function main() {
   // Fill in name
   await page.fill('input#name', 'Alex');
   await page.waitForTimeout(400);
-  await captureFrame(page, 'Name filled in', 5);
+  await captureFrame(page, 'Name filled', 5);
 
   // Check "I am the subject"
   await page.click('input#isSubject');
@@ -130,32 +211,29 @@ async function main() {
   // Click Join
   await page.click('button:has-text("Join Timeline")');
   await page.waitForTimeout(1500);
-  await captureFrame(page, 'Room loaded — biographer greeting', 12);
+  await captureFrame(page, 'Room loaded — biographer greeting', 10);
 
   // ════════════════════════════════════════
-  // ACT 3: Interact with the biographer
+  // ACT 3: Chat with biographer
   // ════════════════════════════════════════
   console.log('Act 3: Chat interaction');
-  // Type a message character by character for visual effect
   const message = "I was born in San Francisco in 1992...";
   const chatInput = page.locator('input[placeholder*="share a memory"]').first();
-  
-  // Type slowly (capture every few chars)
+
   for (let i = 0; i < message.length; i++) {
     await chatInput.type(message[i], { delay: 0 });
-    if (i % 8 === 7 || i === message.length - 1) {
+    if (i % 10 === 9 || i === message.length - 1) {
       await captureFrame(page, `Typing: "${message.substring(0, i + 1)}"`, 1);
     }
   }
-  await captureFrame(page, 'Message typed', 5);
+  await captureFrame(page, 'Message typed', 4);
 
-  // Submit the message
+  // Submit
   await page.click('button[type="submit"]');
   await page.waitForTimeout(500);
-  await captureFrame(page, 'Message sent — waiting for AI', 5);
+  await captureFrame(page, 'Message sent', 4);
 
-  // Wait for AI response to start streaming
-  // Poll for bot message bubble to appear
+  // Wait for AI streaming
   let responseStarted = false;
   for (let i = 0; i < 30; i++) {
     const botBubbles = await page.locator('[class*="bg-secondary"]').count();
@@ -167,56 +245,80 @@ async function main() {
   }
 
   if (responseStarted) {
-    // Capture several frames while streaming
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 6; i++) {
       await page.waitForTimeout(800);
-      await captureFrame(page, `AI streaming response ${i + 1}`, 2);
+      await captureFrame(page, `AI streaming ${i + 1}`, 2);
     }
   }
 
-  // Wait for response to finish
   await page.waitForTimeout(3000);
-  await captureFrame(page, 'AI response complete', 10);
+  await captureFrame(page, 'AI response complete', 8);
 
   // ════════════════════════════════════════
-  // ACT 4: Switch to timeline view
+  // ACT 4: Navigate to photo-rich room
   // ════════════════════════════════════════
-  console.log('Act 4: Timeline view');
-  // Click on Timeline tab (desktop)
-  const timelineTab = page.locator('button:has-text("Timeline")').first();
-  if (await timelineTab.isVisible()) {
-    // Already in split view on desktop — timeline should be visible
-    await captureFrame(page, 'Split view — chat + timeline', 10);
+  console.log('Act 4: Photo-rich room');
+  // Navigate to the pre-seeded room with photos
+  await page.addInitScript(() => {
+    localStorage.setItem('contributor-id', 'alex-gif');
+    localStorage.setItem('contributor-name', 'Alex');
+    localStorage.setItem('contributor-color', '#3d85c6');
+    localStorage.setItem('contributor-is-subject', 'true');
+  });
+  await page.goto(`${BASE_URL}/room/${PHOTO_ROOM}`, { waitUntil: 'networkidle' });
+  await page.waitForTimeout(2500);
+  await captureFrame(page, 'Room with photos on timeline', 12);
+
+  // Scroll timeline down to show party event with 2 photos
+  await page.evaluate(() => {
+    const timeline = document.querySelector('[class*="overflow-y-auto"]');
+    if (timeline) timeline.scrollTop = timeline.scrollHeight;
+  });
+  await page.waitForTimeout(800);
+  await captureFrame(page, 'Timeline scrolled — party photos visible', 10);
+
+  // ════════════════════════════════════════
+  // ACT 5: Open Image Analyzer to show upload flow
+  // ════════════════════════════════════════
+  console.log('Act 5: Photo upload flow');
+  // Click the image analyzer button (camera icon in the chat header area)
+  const analyzerBtn = page.locator('button[aria-label*="image"], button:has(svg.lucide-image), button:has(svg.lucide-camera)').first();
+  const analyzerBtnVisible = await analyzerBtn.isVisible().catch(() => false);
+  
+  if (analyzerBtnVisible) {
+    await analyzerBtn.click();
+    await page.waitForTimeout(800);
+    await captureFrame(page, 'Image analyzer modal open', 10);
+    // Close it
+    const closeBtn = page.locator('button:has(svg.lucide-x)').first();
+    if (await closeBtn.isVisible()) {
+      await closeBtn.click();
+      await page.waitForTimeout(500);
+    }
+  } else {
+    // Try the header icon button approach
+    const headerBtns = page.locator('.flex.items-center.gap-2 button').all();
+    console.log('  ⚠ Image analyzer button not found by aria-label, skipping upload modal');
+    await captureFrame(page, 'Room with photos (no upload modal found)', 10);
   }
 
   // ════════════════════════════════════════
-  // ACT 5: Second contributor joins (simulated via pre-seeded room)
+  // ACT 6: Marco joins
   // ════════════════════════════════════════
-  console.log('Act 5: Simulating second contributor');
-  // Open a new page as Marco
-  const marcoPage = await context.newPage();
-  await marcoPage.addInitScript(() => {
-    localStorage.setItem('contributor-id', 'marco-gif');
-    localStorage.setItem('contributor-name', 'Marco');
-    localStorage.setItem('contributor-color', '#e07a5f');
-    localStorage.setItem('contributor-is-subject', 'false');
+  console.log('Act 6: Second contributor joins');
+  await fetch(`${BASE_URL}/api/rooms/${PHOTO_ROOM}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'join',
+      payload: { id: 'marco-gif', name: 'Marco', color: '#e07a5f', isSubject: false, lastSeen: Date.now(), isOnline: true },
+    }),
   });
-
-  // Get the room URL from the current page
-  const currentUrl = page.url();
-  await marcoPage.goto(currentUrl, { waitUntil: 'networkidle' });
-  await marcoPage.waitForTimeout(2000);
-
-  // Switch back to Alex's page to show updated presence
-  await page.bringToFront();
-  await page.waitForTimeout(1000);
+  await page.waitForTimeout(1500);
   await captureFrame(page, 'Marco joined — 2 online', 12);
 
-  // Clean up Marco's page
-  await marcoPage.close();
-
-  // Final hold on the complete state
-  await captureFrame(page, 'Final state — complete room', 15);
+  // Final hold
+  await captureFrame(page, 'Final state — complete room with photos', 12);
 
   await browser.close();
 
